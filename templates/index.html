@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Contrôle du moteur</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background: #1e1e1e;
+    color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  h1 { font-size: 22px; margin-bottom: 16px; }
+
+  .camera-box {
+    width: 100%;
+    max-width: 640px;
+    background: #000;
+    border: 2px solid #444;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+  .camera-box img {
+    width: 100%;
+    display: block;
+  }
+
+  #label {
+    font-size: 26px;
+    font-weight: bold;
+    margin-bottom: 30px;
+  }
+  #label.on { color: #4caf50; }
+  #label.off { color: #f44336; }
+
+  #bouton {
+    font-size: 22px;
+    font-weight: bold;
+    width: 280px;
+    height: 120px;
+    border: none;
+    border-radius: 12px;
+    background: #2e7d32;
+    color: white;
+    cursor: pointer;
+    touch-action: none;
+  }
+  #bouton:active {
+    background: #1b5e20;
+    transform: scale(0.97);
+  }
+</style>
+</head>
+<body>
+
+  <h1>Contrôle du moteur</h1>
+
+  <div class="camera-box">
+    <img src="{{ url_for('video_feed') }}" alt="Flux webcam">
+  </div>
+
+  <div id="label" class="off">Moteur : OFF</div>
+
+  <button id="bouton">MAINTENIR POUR ACTIVER</button>
+
+  <script>
+    const bouton = document.getElementById('bouton');
+    const label = document.getElementById('label');
+
+    async function moteur(etat) {
+      try {
+        await fetch(`/motor/${etat}`, { method: 'POST' });
+        label.textContent = `Moteur : ${etat === 'on' ? 'ON' : 'OFF'}`;
+        label.className = etat === 'on' ? 'on' : 'off';
+      } catch (e) {
+        console.error('Erreur de communication avec le serveur :', e);
+      }
+    }
+
+    // Souris
+    bouton.addEventListener('mousedown', () => moteur('on'));
+    bouton.addEventListener('mouseup', () => moteur('off'));
+    bouton.addEventListener('mouseleave', () => moteur('off')); // sécurité si le curseur sort du bouton
+
+    // Écran tactile
+    bouton.addEventListener('touchstart', (e) => { e.preventDefault(); moteur('on'); });
+    bouton.addEventListener('touchend', (e) => { e.preventDefault(); moteur('off'); });
+    bouton.addEventListener('touchcancel', (e) => { e.preventDefault(); moteur('off'); });
+
+    // Coupe le moteur si l'utilisateur quitte la page pendant l'appui
+    window.addEventListener('blur', () => moteur('off'));
+  </script>
+
+</body>
+</html>
