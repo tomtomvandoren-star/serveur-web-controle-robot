@@ -121,9 +121,11 @@
   .binding-row button.listening { background: #f9a825; color: #1e1e1e; }
 
   /* Configuration GPIO */
+  .hint { font-size: 12px; color: #999; margin: 0 0 4px; line-height: 1.4; }
   .gpio-form { display: flex; flex-direction: column; gap: 10px; }
-  .gpio-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .gpio-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .gpio-field label { font-size: 14px; color: #ddd; }
+  .gpio-field-controls { display: flex; align-items: center; gap: 8px; }
   .gpio-field input {
     width: 90px;
     padding: 6px 8px;
@@ -134,7 +136,7 @@
     font-size: 15px;
   }
   .gpio-form .actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
-  .gpio-form button {
+  .gpio-form .actions button, .gpio-form .actions #gpio-save {
     background: #1565c0;
     color: white;
     border: none;
@@ -143,6 +145,16 @@
     cursor: pointer;
     font-weight: bold;
   }
+  .gpio-test {
+    background: #00695c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .gpio-test:disabled { opacity: 0.6; cursor: default; }
   #gpio-status { font-size: 13px; color: #aaa; }
   #gpio-status.ok { color: #4caf50; }
   #gpio-status.err { color: #f44336; }
@@ -207,6 +219,28 @@
     font-size: 13px;
   }
   .bt-actions button.danger { background: #6d2323; }
+  .bt-manual { margin-top: 14px; border-top: 1px solid #444; padding-top: 12px; }
+  .bt-manual label { display: block; font-size: 13px; color: #ccc; margin-bottom: 8px; }
+  .bt-manual-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .bt-manual-row input {
+    flex: 1;
+    min-width: 160px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #1e1e1e;
+    color: #fff;
+    font-family: monospace;
+    font-size: 14px;
+  }
+  .bt-manual-row button {
+    background: #00695c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
 
   @media (min-width: 760px) {
     .panels-grid { grid-template-columns: 1fr 1fr; }
@@ -247,20 +281,33 @@
         <div class="gpio-form">
           <div class="gpio-field">
             <label for="pin-right_forward">Droite avant</label>
-            <input type="number" id="pin-right_forward" min="0" max="27">
+            <div class="gpio-field-controls">
+              <input type="number" id="pin-right_forward" min="0" max="27">
+              <button type="button" class="gpio-test" data-key="right_forward">Tester</button>
+            </div>
           </div>
           <div class="gpio-field">
             <label for="pin-right_backward">Droite arrière</label>
-            <input type="number" id="pin-right_backward" min="0" max="27">
+            <div class="gpio-field-controls">
+              <input type="number" id="pin-right_backward" min="0" max="27">
+              <button type="button" class="gpio-test" data-key="right_backward">Tester</button>
+            </div>
           </div>
           <div class="gpio-field">
             <label for="pin-left_forward">Gauche avant</label>
-            <input type="number" id="pin-left_forward" min="0" max="27">
+            <div class="gpio-field-controls">
+              <input type="number" id="pin-left_forward" min="0" max="27">
+              <button type="button" class="gpio-test" data-key="left_forward">Tester</button>
+            </div>
           </div>
           <div class="gpio-field">
             <label for="pin-left_backward">Gauche arrière</label>
-            <input type="number" id="pin-left_backward" min="0" max="27">
+            <div class="gpio-field-controls">
+              <input type="number" id="pin-left_backward" min="0" max="27">
+              <button type="button" class="gpio-test" data-key="left_backward">Tester</button>
+            </div>
           </div>
+          <p class="hint">« Tester » active seule la broche enregistrée pendant ~0,7s (utile pour vérifier le câblage). Enregistrez d'abord un changement de broche avant de le tester.</p>
           <div class="actions">
             <button id="gpio-save">Enregistrer</button>
             <span id="gpio-status"></span>
@@ -277,12 +324,20 @@
     </div>
 
     <div class="panel">
-      <h2>Bluetooth (sortie audio)</h2>
+      <h2>Bluetooth</h2>
+      <p class="hint">Gère tous les périphériques Bluetooth du Raspberry Pi (enceintes, casques, manettes, etc.). Se connecter à un appareil audio bascule automatiquement la sortie son du Pi vers celui-ci.</p>
       <div class="bt-header">
-        <button id="bt-scan">Rechercher des appareils</button>
+        <button id="bt-scan">Rechercher des appareils (~20s)</button>
         <span id="bt-status"></span>
       </div>
       <div class="bt-list" id="bt-list"></div>
+      <div class="bt-manual">
+        <label for="bt-manual-mac">Appareil non détecté ? Ajoutez-le par adresse MAC :</label>
+        <div class="bt-manual-row">
+          <input type="text" id="bt-manual-mac" placeholder="AA:BB:CC:DD:EE:FF">
+          <button type="button" id="bt-manual-add">Jumeler et connecter</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -469,6 +524,29 @@
       }
     });
 
+    document.querySelectorAll('.gpio-test').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        gpioStatus.textContent = `Test de la broche « ${btn.dataset.key} »…`;
+        gpioStatus.className = '';
+        try {
+          const res = await fetch(`/gpio/test/${btn.dataset.key}`, { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+            gpioStatus.textContent = 'Test terminé.';
+            gpioStatus.className = 'ok';
+          } else {
+            gpioStatus.textContent = data.error || 'Erreur lors du test.';
+            gpioStatus.className = 'err';
+          }
+        } catch (e) {
+          gpioStatus.textContent = 'Erreur de communication avec le serveur.';
+          gpioStatus.className = 'err';
+        }
+        btn.disabled = false;
+      });
+    });
+
     // ------------------------------------------------------------------
     // Micro -> haut-parleur du Raspberry Pi
     // ------------------------------------------------------------------
@@ -478,10 +556,25 @@
     let micStream = null;
 
     async function startMic() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        // Les navigateurs n'exposent le micro que sur une origine sécurisée
+        // (https, ou http://localhost). Sur http://<ip>:5000 l'API est absente.
+        const isSecure = window.isSecureContext;
+        micStatus.textContent = isSecure
+          ? "Micro indisponible sur ce navigateur/appareil."
+          : "Le micro nécessite une connexion sécurisée : ouvrez https://" + location.hostname + ":5000 et acceptez le certificat (auto-signé).";
+        return;
+      }
       try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (e) {
-        micStatus.textContent = 'Accès au micro refusé ou indisponible.';
+        if (e.name === 'NotAllowedError' || e.name === 'SecurityError') {
+          micStatus.textContent = "Autorisation micro refusée : vérifiez les permissions du site dans le navigateur.";
+        } else if (e.name === 'NotFoundError') {
+          micStatus.textContent = "Aucun micro détecté sur cet appareil.";
+        } else {
+          micStatus.textContent = `Micro indisponible (${e.name || e.message}).`;
+        }
         return;
       }
       mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm;codecs=opus' });
@@ -626,6 +719,23 @@
         btStatus.textContent = 'Erreur de communication avec le serveur.';
       }
     }
+
+    const btManualInput = document.getElementById('bt-manual-mac');
+    const btManualAdd = document.getElementById('bt-manual-add');
+    const BT_MAC_RE = /^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$/;
+
+    btManualAdd.addEventListener('click', async () => {
+      const mac = btManualInput.value.trim().toUpperCase();
+      if (!BT_MAC_RE.test(mac)) {
+        btStatus.textContent = 'Adresse MAC invalide (format attendu : AA:BB:CC:DD:EE:FF).';
+        return;
+      }
+      btManualAdd.disabled = true;
+      await btAction('pair', mac);
+      await btAction('connect', mac);
+      btManualAdd.disabled = false;
+      btManualInput.value = '';
+    });
   </script>
 
 </body>

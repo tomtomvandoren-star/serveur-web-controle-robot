@@ -2,6 +2,7 @@ import atexit
 import re
 import subprocess
 import threading
+import time
 
 import cv2
 import RPi.GPIO as GPIO
@@ -56,6 +57,10 @@ BT_DEVICE_RE = re.compile(r"^Device ([0-9A-Fa-f:]{17}) (.+)$")
 BT_MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 BT_ACTIONS = {"pair", "connect", "disconnect", "trust", "remove"}
 
+try:
+    subprocess.run(["rfkill", "unblock", "bluetooth"], capture_output=True, timeout=5)
+except (FileNotFoundError, subprocess.TimeoutExpired):
+    pass
 try:
     subprocess.run(["bluetoothctl", "power", "on"], capture_output=True, timeout=10)
 except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -216,6 +221,18 @@ def gpio_config_post():
     return jsonify(PINS)
 
 
+@app.route("/gpio/test/<key>", methods=["POST"])
+def gpio_test(key):
+    """Active brièvement une broche seule, pour vérifier son câblage."""
+    if key not in PINS:
+        return jsonify(error="Broche inconnue"), 400
+    pin = PINS[key]
+    GPIO.output(pin, GPIO.HIGH)
+    time.sleep(0.7)
+    GPIO.output(pin, GPIO.LOW)
+    return jsonify(status="tested", pin=key)
+
+
 @app.route("/audio/stream", methods=["POST"])
 def audio_stream():
     global audio_process
@@ -245,7 +262,9 @@ def bluetooth_devices():
 
 @app.route("/bluetooth/scan", methods=["POST"])
 def bluetooth_scan():
-    bt("--timeout", "8", "scan", "on", timeout=13)
+    # Un scan long (BR/EDR classique + LE) laisse le temps aux enceintes/casques
+    # d'être découverts et à leur nom d'être résolu.
+    bt("--timeout", "20", "scan", "on", timeout=25)
     return jsonify(list_bt_devices())
 
 
@@ -286,5 +305,8 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == "__main__":
-    # host="0.0.0.0" pour accéder depuis un autre appareil sur le réseau local
-    app.run(host="0.0.0.0", port=5000, threaded=True)
+    # host="0.0.0.0" pour accéder depuis un autre appareil sur le réseau local.
+    # HTTPS (certificat auto-signé) est nécessaire : les navigateurs bloquent
+    # l'accès au micro (getUserMedia) sur une origine non sécurisée autre que
+    # « localhost ».
+    app.run(host="0.0.0.0", port=5000, threaded=True, ssl_context="adhoc")
