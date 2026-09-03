@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Contrôle du moteur</title>
+<title>Contrôle de la voiture</title>
 <style>
   * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
   body {
     margin: 0;
-    padding: 20px;
+    padding: 16px;
     font-family: Arial, sans-serif;
     background: #1e1e1e;
     color: #f0f0f0;
@@ -17,86 +17,615 @@
     align-items: center;
     min-height: 100vh;
   }
-  h1 { font-size: 22px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 16px; text-align: center; }
+  h2 { font-size: 16px; margin: 0 0 10px; color: #ccc; }
+
+  .layout {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
 
   .camera-box {
     width: 100%;
     max-width: 640px;
+    margin: 0 auto;
     background: #000;
     border: 2px solid #444;
     border-radius: 8px;
     overflow: hidden;
-    margin-bottom: 30px;
   }
   .camera-box img {
     width: 100%;
     display: block;
   }
 
-  #label {
-    font-size: 26px;
-    font-weight: bold;
-    margin-bottom: 30px;
+  .panel {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 10px;
+    padding: 14px;
   }
-  #label.on { color: #4caf50; }
-  #label.off { color: #f44336; }
 
-  #bouton {
+  .panels-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  /* Pavé directionnel */
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 320px;
+    margin: 0 auto;
+    aspect-ratio: 1 / 1;
+  }
+  .dpad button {
     font-size: 22px;
     font-weight: bold;
-    width: 280px;
-    height: 120px;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     background: #2e7d32;
     color: white;
     cursor: pointer;
     touch-action: none;
   }
-  #bouton:active {
-    background: #1b5e20;
-    transform: scale(0.97);
+  .dpad button:active { background: #1b5e20; transform: scale(0.96); }
+  .dpad button.active { background: #1b5e20; }
+  #btn-forward  { grid-column: 2; grid-row: 1; }
+  #btn-left     { grid-column: 1; grid-row: 2; }
+  #btn-stop     { grid-column: 2; grid-row: 2; background: #c62828; }
+  #btn-stop:active { background: #8e0000; }
+  #btn-right    { grid-column: 3; grid-row: 2; }
+  #btn-backward { grid-column: 2; grid-row: 3; }
+
+  #move-status {
+    text-align: center;
+    margin-top: 10px;
+    font-weight: bold;
+    color: #4caf50;
+  }
+
+  /* Assignation des touches */
+  .bindings-list { display: flex; flex-direction: column; gap: 8px; }
+  .binding-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .binding-key {
+    font-family: monospace;
+    background: #333;
+    border-radius: 6px;
+    padding: 4px 10px;
+    min-width: 28px;
+    text-align: center;
+  }
+  .binding-row button {
+    background: #37474f;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .binding-row button.listening { background: #f9a825; color: #1e1e1e; }
+
+  /* Configuration GPIO */
+  .gpio-form { display: flex; flex-direction: column; gap: 10px; }
+  .gpio-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .gpio-field label { font-size: 14px; color: #ddd; }
+  .gpio-field input {
+    width: 90px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #1e1e1e;
+    color: #fff;
+    font-size: 15px;
+  }
+  .gpio-form .actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  .gpio-form button {
+    background: #1565c0;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  #gpio-status { font-size: 13px; color: #aaa; }
+  #gpio-status.ok { color: #4caf50; }
+  #gpio-status.err { color: #f44336; }
+
+  /* Micro */
+  .mic-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  #mic-toggle {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 10px;
+    background: #4527a0;
+    color: white;
+    cursor: pointer;
+    width: 100%;
+    max-width: 320px;
+  }
+  #mic-toggle.recording { background: #d32f2f; }
+  #mic-status { font-size: 13px; color: #aaa; }
+
+  /* Bluetooth */
+  .bt-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .bt-header button {
+    background: #00695c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .bt-header button:disabled { opacity: 0.6; cursor: default; }
+  #bt-status { font-size: 13px; color: #aaa; }
+  .bt-empty { font-size: 14px; color: #888; padding: 6px 0; }
+  .bt-list { display: flex; flex-direction: column; gap: 8px; }
+  .bt-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .bt-info { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+  .bt-name { font-weight: bold; }
+  .bt-mac { font-size: 12px; font-family: monospace; color: #999; }
+  .bt-badges { display: flex; gap: 6px; }
+  .bt-badge { font-size: 11px; border-radius: 4px; padding: 2px 6px; }
+  .bt-badge.ok { background: #2e7d32; color: white; }
+  .bt-badge.neutral { background: #555; color: #ddd; }
+  .bt-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bt-actions button {
+    background: #37474f;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .bt-actions button.danger { background: #6d2323; }
+
+  @media (min-width: 760px) {
+    .panels-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
 </head>
 <body>
 
-  <h1>Contrôle du moteur</h1>
+  <h1>Contrôle de la voiture</h1>
 
-  <div class="camera-box">
-    <img src="{{ url_for('video_feed') }}" alt="Flux webcam">
+  <div class="layout">
+
+    <div class="camera-box">
+      <img src="{{ url_for('video_feed') }}" alt="Flux webcam">
+    </div>
+
+    <div class="panel">
+      <h2>Déplacement</h2>
+      <div class="dpad">
+        <button id="btn-forward" data-action="forward">▲</button>
+        <button id="btn-left" data-action="left">◀</button>
+        <button id="btn-stop" data-action="stop">■</button>
+        <button id="btn-right" data-action="right">▶</button>
+        <button id="btn-backward" data-action="backward">▼</button>
+      </div>
+      <div id="move-status">Arrêté</div>
+    </div>
+
+    <div class="panels-grid">
+
+      <div class="panel">
+        <h2>Touches du clavier</h2>
+        <div class="bindings-list" id="bindings-list"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Broches GPIO</h2>
+        <div class="gpio-form">
+          <div class="gpio-field">
+            <label for="pin-right_forward">Droite avant</label>
+            <input type="number" id="pin-right_forward" min="0" max="27">
+          </div>
+          <div class="gpio-field">
+            <label for="pin-right_backward">Droite arrière</label>
+            <input type="number" id="pin-right_backward" min="0" max="27">
+          </div>
+          <div class="gpio-field">
+            <label for="pin-left_forward">Gauche avant</label>
+            <input type="number" id="pin-left_forward" min="0" max="27">
+          </div>
+          <div class="gpio-field">
+            <label for="pin-left_backward">Gauche arrière</label>
+            <input type="number" id="pin-left_backward" min="0" max="27">
+          </div>
+          <div class="actions">
+            <button id="gpio-save">Enregistrer</button>
+            <span id="gpio-status"></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel mic-panel">
+      <h2>Microphone</h2>
+      <button id="mic-toggle">Activer le micro</button>
+      <div id="mic-status">Micro désactivé</div>
+    </div>
+
+    <div class="panel">
+      <h2>Bluetooth (sortie audio)</h2>
+      <div class="bt-header">
+        <button id="bt-scan">Rechercher des appareils</button>
+        <span id="bt-status"></span>
+      </div>
+      <div class="bt-list" id="bt-list"></div>
+    </div>
+
   </div>
 
-  <div id="label" class="off">Moteur : OFF</div>
-
-  <button id="bouton">MAINTENIR POUR ACTIVER</button>
-
   <script>
-    const bouton = document.getElementById('bouton');
-    const label = document.getElementById('label');
+    // ------------------------------------------------------------------
+    // Déplacement (boutons + clavier)
+    // ------------------------------------------------------------------
+    const moveStatus = document.getElementById('move-status');
+    let currentAction = 'stop';
 
-    async function moteur(etat) {
+    async function sendMove(action) {
+      currentAction = action;
+      moveStatus.textContent = {
+        forward: 'Avance', backward: 'Recule',
+        left: 'Tourne à gauche', right: 'Tourne à droite', stop: 'Arrêté',
+      }[action] || action;
+      document.querySelectorAll('.dpad button').forEach(b => {
+        b.classList.toggle('active', b.dataset.action === action && action !== 'stop');
+      });
       try {
-        await fetch(`/motor/${etat}`, { method: 'POST' });
-        label.textContent = `Moteur : ${etat === 'on' ? 'ON' : 'OFF'}`;
-        label.className = etat === 'on' ? 'on' : 'off';
+        await fetch(`/move/${action}`, { method: 'POST' });
       } catch (e) {
         console.error('Erreur de communication avec le serveur :', e);
       }
     }
 
-    // Souris
-    bouton.addEventListener('mousedown', () => moteur('on'));
-    bouton.addEventListener('mouseup', () => moteur('off'));
-    bouton.addEventListener('mouseleave', () => moteur('off')); // sécurité si le curseur sort du bouton
+    document.querySelectorAll('.dpad button[data-action]').forEach(btn => {
+      const action = btn.dataset.action;
+      const press = (e) => { e.preventDefault(); sendMove(action); };
+      const release = (e) => { e.preventDefault(); if (action !== 'stop') sendMove('stop'); };
+      btn.addEventListener('mousedown', press);
+      btn.addEventListener('mouseup', release);
+      btn.addEventListener('mouseleave', release);
+      btn.addEventListener('touchstart', press, { passive: false });
+      btn.addEventListener('touchend', release, { passive: false });
+      btn.addEventListener('touchcancel', release, { passive: false });
+      if (action === 'stop') {
+        btn.addEventListener('click', () => sendMove('stop'));
+      }
+    });
 
-    // Écran tactile
-    bouton.addEventListener('touchstart', (e) => { e.preventDefault(); moteur('on'); });
-    bouton.addEventListener('touchend', (e) => { e.preventDefault(); moteur('off'); });
-    bouton.addEventListener('touchcancel', (e) => { e.preventDefault(); moteur('off'); });
+    window.addEventListener('blur', () => sendMove('stop'));
 
-    // Coupe le moteur si l'utilisateur quitte la page pendant l'appui
-    window.addEventListener('blur', () => moteur('off'));
+    // ------------------------------------------------------------------
+    // Assignation des touches du clavier aux actions
+    // ------------------------------------------------------------------
+    const ACTIONS = [
+      { key: 'forward', label: 'Avancer' },
+      { key: 'backward', label: 'Reculer' },
+      { key: 'left', label: 'Tourner à gauche' },
+      { key: 'right', label: 'Tourner à droite' },
+    ];
+    const DEFAULT_BINDINGS = { forward: 'z', backward: 's', left: 'q', right: 'd' };
+
+    function loadBindings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('carKeyBindings'));
+        if (saved) return { ...DEFAULT_BINDINGS, ...saved };
+      } catch (e) { /* ignore */ }
+      return { ...DEFAULT_BINDINGS };
+    }
+
+    let bindings = loadBindings();
+    let listeningFor = null;
+    const bindingsList = document.getElementById('bindings-list');
+
+    function renderBindings() {
+      bindingsList.innerHTML = '';
+      ACTIONS.forEach(({ key, label }) => {
+        const row = document.createElement('div');
+        row.className = 'binding-row';
+
+        const name = document.createElement('span');
+        name.textContent = label;
+
+        const keySpan = document.createElement('span');
+        keySpan.className = 'binding-key';
+        keySpan.textContent = (bindings[key] || '?').toUpperCase();
+
+        const change = document.createElement('button');
+        change.textContent = listeningFor === key ? 'Appuyez sur une touche…' : 'Modifier';
+        change.classList.toggle('listening', listeningFor === key);
+        change.addEventListener('click', () => {
+          listeningFor = key;
+          renderBindings();
+        });
+
+        row.append(name, keySpan, change);
+        bindingsList.appendChild(row);
+      });
+    }
+    renderBindings();
+
+    function actionForKey(key) {
+      const entry = Object.entries(bindings).find(([, k]) => k === key);
+      return entry ? entry[0] : null;
+    }
+
+    const pressedActions = new Set();
+
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+
+      if (listeningFor) {
+        e.preventDefault();
+        // Retire cette touche d'une éventuelle autre action pour éviter les doublons
+        Object.keys(bindings).forEach(k => { if (bindings[k] === key) bindings[k] = ''; });
+        bindings[listeningFor] = key;
+        try { localStorage.setItem('carKeyBindings', JSON.stringify(bindings)); } catch (err) { /* ignore */ }
+        listeningFor = null;
+        renderBindings();
+        return;
+      }
+
+      const action = actionForKey(key);
+      if (!action || e.repeat) return;
+      pressedActions.add(action);
+      sendMove(action);
+    });
+
+    document.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      const action = actionForKey(key);
+      if (!action) return;
+      pressedActions.delete(action);
+      if (pressedActions.size === 0) {
+        sendMove('stop');
+      } else {
+        sendMove([...pressedActions][pressedActions.size - 1]);
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // Configuration des broches GPIO
+    // ------------------------------------------------------------------
+    const gpioInputs = {
+      right_forward: document.getElementById('pin-right_forward'),
+      right_backward: document.getElementById('pin-right_backward'),
+      left_forward: document.getElementById('pin-left_forward'),
+      left_backward: document.getElementById('pin-left_backward'),
+    };
+    const gpioStatus = document.getElementById('gpio-status');
+
+    async function loadGpioConfig() {
+      try {
+        const res = await fetch('/gpio/config');
+        const data = await res.json();
+        Object.entries(gpioInputs).forEach(([key, input]) => { input.value = data[key]; });
+      } catch (e) {
+        gpioStatus.textContent = 'Impossible de charger la configuration.';
+        gpioStatus.className = 'err';
+      }
+    }
+    loadGpioConfig();
+
+    document.getElementById('gpio-save').addEventListener('click', async () => {
+      const payload = {};
+      Object.entries(gpioInputs).forEach(([key, input]) => { payload[key] = parseInt(input.value, 10); });
+
+      if (Object.values(payload).some(v => Number.isNaN(v))) {
+        gpioStatus.textContent = 'Merci de remplir toutes les broches.';
+        gpioStatus.className = 'err';
+        return;
+      }
+
+      try {
+        const res = await fetch('/gpio/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          gpioStatus.textContent = 'Configuration enregistrée.';
+          gpioStatus.className = 'ok';
+        } else {
+          gpioStatus.textContent = data.error || 'Erreur lors de l\'enregistrement.';
+          gpioStatus.className = 'err';
+        }
+      } catch (e) {
+        gpioStatus.textContent = 'Erreur de communication avec le serveur.';
+        gpioStatus.className = 'err';
+      }
+    });
+
+    // ------------------------------------------------------------------
+    // Micro -> haut-parleur du Raspberry Pi
+    // ------------------------------------------------------------------
+    const micToggle = document.getElementById('mic-toggle');
+    const micStatus = document.getElementById('mic-status');
+    let mediaRecorder = null;
+    let micStream = null;
+
+    async function startMic() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        micStatus.textContent = 'Accès au micro refusé ou indisponible.';
+        return;
+      }
+      mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm;codecs=opus' });
+      mediaRecorder.ondataavailable = async (e) => {
+        if (e.data && e.data.size > 0) {
+          try { await fetch('/audio/stream', { method: 'POST', body: e.data }); }
+          catch (err) { console.error('Erreur envoi audio :', err); }
+        }
+      };
+      mediaRecorder.start(250);
+      micToggle.textContent = 'Désactiver le micro';
+      micToggle.classList.add('recording');
+      micStatus.textContent = 'Micro actif — envoi du son vers la voiture…';
+    }
+
+    async function stopMic() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      mediaRecorder = null;
+      micStream = null;
+      micToggle.textContent = 'Activer le micro';
+      micToggle.classList.remove('recording');
+      micStatus.textContent = 'Micro désactivé';
+      try { await fetch('/audio/stop', { method: 'POST' }); }
+      catch (e) { /* ignore */ }
+    }
+
+    micToggle.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') stopMic();
+      else startMic();
+    });
+
+    window.addEventListener('beforeunload', () => { if (mediaRecorder) stopMic(); });
+
+    // ------------------------------------------------------------------
+    // Bluetooth (jumelage / connexion, sortie audio)
+    // ------------------------------------------------------------------
+    const btScanBtn = document.getElementById('bt-scan');
+    const btStatus = document.getElementById('bt-status');
+    const btList = document.getElementById('bt-list');
+
+    function btBadge(text, kind) {
+      const span = document.createElement('span');
+      span.className = `bt-badge ${kind}`;
+      span.textContent = text;
+      return span;
+    }
+
+    function btButton(label, onClick, danger) {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      if (danger) btn.classList.add('danger');
+      btn.addEventListener('click', onClick);
+      return btn;
+    }
+
+    function renderBtDevices(devices) {
+      btList.innerHTML = '';
+      if (!devices || devices.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'bt-empty';
+        empty.textContent = 'Aucun appareil détecté. Lancez une recherche.';
+        btList.appendChild(empty);
+        return;
+      }
+
+      devices.forEach(dev => {
+        const row = document.createElement('div');
+        row.className = 'bt-row';
+
+        const info = document.createElement('div');
+        info.className = 'bt-info';
+        const name = document.createElement('div');
+        name.className = 'bt-name';
+        name.textContent = dev.name;
+        const mac = document.createElement('div');
+        mac.className = 'bt-mac';
+        mac.textContent = dev.mac;
+        const badges = document.createElement('div');
+        badges.className = 'bt-badges';
+        if (dev.connected) badges.appendChild(btBadge('Connecté', 'ok'));
+        else if (dev.paired) badges.appendChild(btBadge('Jumelé', 'neutral'));
+        if (dev.trusted) badges.appendChild(btBadge('Approuvé', 'neutral'));
+        info.append(name, mac, badges);
+
+        const actions = document.createElement('div');
+        actions.className = 'bt-actions';
+        if (!dev.paired) {
+          actions.appendChild(btButton('Jumeler', () => btAction('pair', dev.mac)));
+        }
+        if (dev.connected) {
+          actions.appendChild(btButton('Déconnecter', () => btAction('disconnect', dev.mac)));
+        } else {
+          actions.appendChild(btButton('Connecter', () => btAction('connect', dev.mac)));
+        }
+        actions.appendChild(btButton('Oublier', () => btAction('remove', dev.mac), true));
+
+        row.append(info, actions);
+        btList.appendChild(row);
+      });
+    }
+
+    async function loadBtDevices() {
+      try {
+        const res = await fetch('/bluetooth/devices');
+        renderBtDevices(await res.json());
+      } catch (e) {
+        btStatus.textContent = 'Impossible de récupérer les appareils Bluetooth.';
+      }
+    }
+    loadBtDevices();
+
+    btScanBtn.addEventListener('click', async () => {
+      btScanBtn.disabled = true;
+      btStatus.textContent = 'Recherche en cours (quelques secondes)…';
+      try {
+        const res = await fetch('/bluetooth/scan', { method: 'POST' });
+        renderBtDevices(await res.json());
+        btStatus.textContent = '';
+      } catch (e) {
+        btStatus.textContent = 'Erreur lors de la recherche.';
+      }
+      btScanBtn.disabled = false;
+    });
+
+    async function btAction(action, mac) {
+      btStatus.textContent = 'Action en cours…';
+      try {
+        const res = await fetch(`/bluetooth/${action}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          renderBtDevices(data);
+          btStatus.textContent = '';
+        } else {
+          btStatus.textContent = data.error || 'Erreur.';
+        }
+      } catch (e) {
+        btStatus.textContent = 'Erreur de communication avec le serveur.';
+      }
+    }
   </script>
 
 </body>
