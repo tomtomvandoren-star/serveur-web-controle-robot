@@ -11,10 +11,10 @@ from flask import Flask, Response, jsonify, render_template, request
 # ----------------------------------------------------------------------
 # Broches GPIO des moteurs (modifiables ici, ou depuis l'interface web)
 # ----------------------------------------------------------------------
-PIN_RIGHT_FORWARD = 17   # roues droites - avant
-PIN_RIGHT_BACKWARD = 27  # roues droites - arrière
-PIN_LEFT_FORWARD = 22    # roues gauches - avant
-PIN_LEFT_BACKWARD = 23   # roues gauches - arrière
+PIN_RIGHT_FORWARD = 16   # roues droites - avant
+PIN_RIGHT_BACKWARD = 12  # roues droites - arrière
+PIN_LEFT_FORWARD = 20    # roues gauches - avant
+PIN_LEFT_BACKWARD = 21   # roues gauches - arrière
 
 PINS = {
     "right_forward": PIN_RIGHT_FORWARD,
