@@ -1,4 +1,3 @@
 flask
 opencv-python
 RPi.GPIO
-pyopenssl
